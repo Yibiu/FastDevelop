@@ -143,5 +143,5 @@ public:
 	}
 
 protected:
-	CLocker _locker;
+	CLocker &_locker;
 };

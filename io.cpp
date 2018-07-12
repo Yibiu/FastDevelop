@@ -259,7 +259,7 @@ bool CBufferIO::write(uint32_t size, const uint8_t *data_ptr)
 	 if (_buffer_size >= excp_size)
 	 	return true;
 
-	excp_size = IO_ALIGN(excp_size, IO_ALIGN_VALUE);
+	excp_size = IO_ALIGN_SIZE(excp_size, IO_ALIGN_VALUE);
 	_buffer_ptr = (uint8_t *)realloc(_buffer_ptr, excp_size);
 	if (NULL == _buffer_ptr) {
 		_buffer_size = 0;
@@ -397,7 +397,8 @@ CFileIO::~CFileIO()
 
 bool CFileIO::open(const char *file_path_ptr, int flags)
 {
-	_file_fp = open64(file_path_ptr, flags);
+	flags |= O_LARGEFILE;
+	_file_fp = ::open(file_path_ptr, flags);
 	if (-1 == _file_fp)
 		return false;
 
@@ -407,7 +408,7 @@ bool CFileIO::open(const char *file_path_ptr, int flags)
 void CFileIO::close()
 {
 	if (-1 != _file_fp) {
-		close(_file_fp);
+		::close(_file_fp);
 		_file_fp = -1;
 	}
 }
@@ -419,87 +420,319 @@ bool CFileIO::is_valid()
 
 uint64_t CFileIO::ftell()
 {
+	if (!is_valid())
+		return 0;
+
 	return lseek64(_file_fp, 0, SEEK_CUR);
 }
 
 bool CFileIO::seek(int64_t offset, int origin)
 {
-	if (lseek64(_file_fp, offset, origin) < 0)
+	if (!is_valid())
 		return false;
-	
-	return true;
+
+	reuturn (lseek64(_file_fp, offset, origin) >= 0);
 }
 
 bool CFileIO::flush()
 {
+	if (!is_valid())
+		return false;
+	
 	return (0 == fdatasync(_file_fp))
 }
 
 bool CFileIO::read(uint32_t size, uint8_t *data_ptr)
 {
-	return (size == read(_file_fd, data_ptr, size));
+	if (!is_valid())
+		return false;
+	
+	return (size == ::read(_file_fd, data_ptr, size));
 }
 
 bool CFileIO::write(uint32_t size, const uint8_t *data_ptr)
 {
-	return (size == write(_file_fd, data_ptr, size));
+	if (!is_valid())
+		return false;
+	
+	return (size == ::write(_file_fd, data_ptr, size));
 }
 
 
 // CDirectFileIO
 CDirectFileIO::CDirectFileIO()
 {
-	_file_fp = -1;
+	_file_path = "";
+	_file_fd = -1;
+    _block_size = 0;
+    _block_count = 0;
+    _buffer_size = 0;
+    _buffer_ptr = NULL;
 
-    _page_size = 0;
+    _buffer_offset = 0;
+    _file_offset = 0;
+    _file_end = 0;
+	_file_size = 0;
+	_data_chaned = false;
 }
 
 CDirectFileIO::~CDirectFileIO()
 {
 }
 
-bool CDirectFileIO::open(const char *file_path_ptr, int flags)
+bool CDirectFileIO::open(const char *file_path_ptr, int flags, uint32_t block_size, uint32_t block_count)
 {
-	if (!(flags & O_DIRECT) || !(flags & O_SYNC))
-		flags |= O_DIRECT | O_SYNC;
-	_file_fp = open64(file_path_ptr, flags);
-	if (-1 == _file_fp)
-		return false;
+	bool success = false;
+	do {
+		flags |= O_DIRECT | O_LARGEFILE;//O_SYNC
+		_file_fd = ::open(file_path_ptr, flags, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+		if (-1 == _file_fd)
+			break;
+		
+		_block_size = block_size;
+		_block_count = block_count;
+		_buffer_size = block_size * block_count;
+		if (0 != posix_memalign(&_buffer_ptr, block_size, _buffer_size))
+			break;
+		
+		success = true;
+	} while(false);
 
-	_page_size = getpagesize();
-	return true;
-}
+	if (success) {
+		_file_path = file_path_ptr;
 
-void CDirectFileIO::close()
-{
-	if (-1 != _file_fp) {
-		close(_file_fp);
-		_file_fp = -1;
+    	_buffer_offset = 0;
+    	_file_offset = 0;
+    	_file_end = 0;
+		_file_size = 0;
+		_data_chaned = false;
 	}
+	else {
+		close();
+	}
+
+	return success;
 }
 
-uint32_t CDirectFileIO::get_pagesize()
+bool CDirectFileIO::close()
 {
-	return getpagesize();
+	bool error = false;
+	if (-1 != _file_fd) {
+		error = !_write_buffer();
+		::close(_file_fd);
+		_file_fd = -1;
+
+		if (_file_size != _file_end) {
+			if (0 != truncate(_file_path.c_str(), _file_end)) {
+				error = true;
+			}
+			else {
+				_file_size = _file_end;
+			}
+		}
+	}
+	if (NULL != _buffer_ptr) {
+		free(_buffer_ptr);
+		_buffer_ptr = NULL;
+	}
+
+	return (!error);
+}
+
+void CDirectFileIO::get_size(uint32_t &block_size, uint32_t &block_count)
+{
+	block_size = _block_size;
+	block_count = _block_count;
 }
 
 bool CDirectFileIO::is_valid()
 {
-	return (-1 != _file_fp);
+	return (-1 != _file_fd);
+}
+
+uint64_t CDirectFileIO::ftell()
+{
+	return _file_offset;
+}
+
+bool CDirectFileIO::seek(int64_t offset, int origin)
+{
+	if (!is_valid())
+		return false;
+	
+	uint64_t offset_from_set = 0;
+	switch(origin)
+	{
+	case SEEK_SET:
+		offset_from_set = offset;
+		break;
+	case SEEK_CUR:
+		offset_from_set = _total_offset + offset;
+		break;
+	case SEEK_END:
+		offset_from_set = _total_end + offset;
+		break;
+	default:
+		return false;
+	}
+	if (offset_from_set > _total_end)
+		return false;
+
+	bool error = false;
+	// Seek position is in buffer
+	if (offset_from_set >= _buffer_offset && offset_from_set < _buffer_offset + _buffer_size) {
+		_file_offset = offset_from_set;
+	}
+	// Seek position is in file
+	else {
+		do {
+			if (!_write_buffer()) {
+				error = true;
+				break;
+			}
+
+			_file_offset = offset_from_set;
+			_buffer_offset = IO_ALIGN_OFFSET(offset_from_set, _block_size);
+			if (-1 == lseek64(_file_fd, _buffer_offset, SEEK_SET)) {
+				error = true;
+				break;
+			}
+			if (!_read_buffer()) {
+				error = true;
+				break;
+			}
+		} while(false);
+	}
+
+	return (!error);
+}
+
+bool CDirectFileIO::flush()
+{
+	bool success = false;
+	do {
+		if (!is_valid())
+			break;
+		if (!_write_buffer())
+			break;
+		if (EIO == fdatasync(_file_fd))
+			break;
+
+		success = true;
+	} while(false);
+
+	return success;
 }
 
 bool CDirectFileIO::read(uint32_t size, uint8_t *data_ptr)
 {
-	if (0 != size % _page_size)
+	if (0 == size)
+		return true;
+
+	if (_file_offset + size > _file_end)
 		return false;
 	
-	return (size == read(_file_fp, data_ptr, size));
+	uint32_t offset_in_buffer = (uint32_t)(_file_offset - _buffer_offset);
+	if (offset_in_buffer == _buffer_size) {
+		_buffer_offset = _file_offset;
+		offset_in_buffer = 0;
+		_read_buffer();
+	}
+	uint32_t bytes_to_copy = (uint32_t)(_buffer_offset + _buffer_size - _file_offset);
+	if (bytes_to_copy > size)
+		bytes_to_copy = size;
+	memcpy(data_ptr, (uint8_t *)_buffer_ptr + offset_in_buffer, bytes_to_copy);
+	_file_offset += bytes_to_copy;
+	
+	return read(size - bytes_to_copy, data_ptr + bytes_to_copy);
 }
 
 bool CDirectFileIO::write(uint32_t size, const uint8_t *data_ptr)
 {
-	if (0 != size % _page_size)
+	if (0 == size)
+		return true;
+
+	uint32_t offset_in_buffer = (uint32_t)(_file_offset - _buffer_offset);
+	if (offset_in_buffer == _buffer_size) {
+		if (!_write_buffer())
+			return false;
+		_buffer_offset = _file_offset;
+		if (!_read_buffer())
+			return false;
+
+		offset_in_buffer = 0;
+	}
+
+	uint32_t bytes_to_copy = (uint32_t)(_buffer_offset + _buffer_size - _file_offset);
+	if (bytes_to_copy > size)
+		bytes_to_copy = size;
+	memcpy((uint8_t *)_buffer_ptr + offset_in_buffer, data_ptr, bytes_to_copy);
+	_data_chaned = true;
+	_file_offset += bytes_to_copy;
+	if (_file_offset > _file_end)
+		_file_end = _file_offset;
+
+	return write(size - bytes_to_copy, data_ptr + bytes_to_copy);
+}
+
+
+bool CDirectFileIO::_read_buffer()
+{
+	uint8_t *ptr = (uint8_t *)_buffer_ptr;
+	size_t size_to_read = _buffer_size;
+	int nb_read = 0;
+	bool error = false;
+	do {
+		nb_read = ::read(_file_fd, ptr, size_to_read);
+		if (nb_read < 0) {
+			error = true;
+			break;
+		}
+		if ((nb_read == 0 && size_to_read > 0) || !IS_ALIGNED(nb_read, _block_size - 1)) {
+			if (_buffer_offset + _buffer_size == _file_size + size_to_read - nb_read) {
+				memset(ptr, 0, size_to_read);
+			}
+			else {
+				error = true;
+			}
+			break;
+		}
+
+		ptr += nb_read;
+		size_to_read -= nb_read;
+	} while (size_to_read > 0);
+
+	return (!error);
+}
+
+bool CDirectFileIO::_write_buffer()
+{
+	if (!_data_chaned)
+		return true;
+	_data_chaned = false;
+
+	if (-1 == lseek64(_file_fd, _buffer_offset, SEEK_SET))
 		return false;
 
-	return (size == write(_file_fp, data_ptr, size));
+	uint8_t *ptr = (uint8_t *)_buffer_ptr;
+	size_t size_to_write = _buffer_size;
+	int nb_write = 0;
+	bool error = false;
+	do {
+		nb_write = ::write(_file_fd, ptr, size_to_write);
+		if (nb_write < 0 || (nb_write == 0 && size_to_write > 0) || !IO_IS_ALIGNED(nb_write, _block_size - 1)) {
+			error = true;
+			break;
+		}
+
+		ptr += nb_write;
+		size_to_write -= nb_write;
+	} while (size_to_write > 0);
+
+	uint64_t end = _buffer_offset + _buffer_size;
+	if (_file_size < end)
+		_file_size = end;
+
+	return (!error);
 }
+

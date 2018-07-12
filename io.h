@@ -1,4 +1,8 @@
 #pragma once
+#ifndef _LARGEFILE64_SOURCE
+#define _LARGEFILE64_SOURCE
+#endif
+#define _FILE_OFFSET_BITS	64
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -12,7 +16,9 @@
 
 
 #define IO_ALIGN_VALUE  1024
-#define IO_ALIGN(size, align)   ((size + align - 1) & ~(align - 1))
+#define IO_ALIGN_SIZE(size, align)      ((size + align - 1) & ~(align - 1))
+#define IO_ALIGN_PFFSET(offset, align)  (offset & ~(align - 1))
+#define IO_IS_ALIGNED(value, align)     ((value & (align - 1)) == 0)
 
 
 class ICBaseIO
@@ -127,23 +133,41 @@ protected:
 };
 
 
-class CDirectFileIO
+class CDirectFileIO : public ICBaseIO
 {
 public:
     CDirectFileIO();
     virtual ~CDirectFileIO();
 
-    bool open(const char *file_path_ptr, int flags);
-    void close();
-    uint32_t get_pagesize();
+    bool open(const char *file_path_ptr, int flags, uint32_t block_size, uint32_t block_count);
+    bool close();
+    void get_size(uint32_t &block_size, uint32_t &block_count);
 
-    bool is_valid();
-    bool read(uint32_t size, uint8_t *data_ptr);
-    bool write(uint32_t size, const uint8_t *data_ptr);
+    // ICBaseIO
+    virtual bool is_valid();
+    virtual uint64_t ftell();
+    virtual bool seek(int64_t offset, int origin);
+    virtual bool flush();
+    virtual bool read(uint32_t size, uint8_t *data_ptr);
+    virtual bool write(uint32_t size, const uint8_t *data_ptr);
 
 protected:
-    int _file_fp;
+    bool _read_buffer();
+    bool _write_buffer();
 
-    uint32_t _page_size;
+protected:
+    std::string _file_path;
+    int _file_fd;
+    uint32_t _block_size;
+    uint32_t _block_count;
+    uint32_t _buffer_size;
+    void *_buffer_ptr;
+
+    uint64_t _buffer_offset; // Indicate the buffer start position in the file
+    uint64_t _file_offset; // operating offset record
+    uint64_t _file_end; // operating end record
+    uint64_t _file_size;
+    bool _data_chaned;
 };
+
 #endif

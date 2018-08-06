@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <list>
 #include "locker.h"
+#include "event.h"
 
 
 class ICPacketSink;
@@ -45,9 +46,9 @@ public:
 	}
 	bool is_video()
 	{
-		return (VR_PACKET_VIDEO_RAW == _packet_type
-			|| VR_PACKET_VIDEO_H264 == _packet_type
-			|| VR_PACKET_VIDEO_HEVC == _packet_type);
+		return (PACKET_VIDEO_RAW == _packet_type
+			|| PACKET_VIDEO_H264 == _packet_type
+			|| PACKET_VIDEO_HEVC == _packet_type);
 	}
 
 	bool create(uint32_t id, uint32_t size, ICPacketSink *sink_ptr)
@@ -295,4 +296,115 @@ public:
 protected:
 	CLocker _locker;
 	CPacketList _unused_packets;
+};
+
+
+class CPacketThread : public CPacketConnector
+{
+public:
+	CPacketThread()
+	{
+		_running = false;
+		_thread_ptr = NULL;
+
+    	_packet_list.clear();
+	}
+	virtual ~CPacketThread() {}
+
+	bool is_valid()
+	{
+		return _running;
+	}
+	uint32_t packet_count()
+	{
+		CAutoLocker auto_locker(_locker);
+		return (uint32_t)_packet_list.size();
+	}
+	bool create()
+	{
+		bool success = false;
+
+		do {
+			_running = true;
+			if (!_event.create())
+				break;
+			_thread_ptr = new std::thread(thread_proc, this);
+			if (NULL == _thread_ptr)
+				break;
+
+			success = true;
+		} while(false);
+		
+		return success;
+	}
+	void destroy()
+	{
+		if (!_running) {
+			_running = false;
+			_event.set();
+			_thread_ptr->join();
+			delete _thread_ptr;
+			_thread_ptr = NULL;
+			_event.destroy();		
+		}
+
+		{
+			CAutoLocker auto_locker(_locker);
+			CPacketList::iterator iter;
+			for (iter = _packet_list.begin(); iter != _packet_list.end(); iter++) {
+				CPacket *packet_ptr = (*iter);
+				packet_ptr->release();
+			}		
+			_packet_list.clear();
+		}
+	}
+
+	static void thread_proc(void *param_ptr)
+	{
+		CPacketThread *this_ptr = (CPacketThread *)param_ptr;
+		if (NULL != this_ptr)
+			this_ptr->thread_proc_internal();
+	}
+	void thread_proc_internal()
+	{
+		while (_running) 
+		{
+			int ret = CEvent::wait_for_single_object(&_event);
+			if (-1 == ret)
+				break;
+
+			while (_running) 
+			{
+				CPacket *packet_ptr = NULL;
+				{
+					CAutoLocker locker(_locker);
+					if (0 == _packet_list.size())
+						break;	
+					packet_ptr = _packet_list.front();
+					_packet_list.pop_front();
+				}
+
+				CPacketConnector::push_media_packet(packet_ptr);
+				
+				packet_ptr->release();
+			}
+		}
+	}
+
+	// i_sink
+	virtual void push_media_packet(CPacket *packet_ptr)
+	{
+		CAutoLocker locker(_locker);
+		packet_ptr->add_ref();
+		_packet_list.push_back(packet_ptr);
+		_event.set();
+	}
+
+protected:
+	bool _running;
+	std::thread *_thread_ptr;
+	CEvent _event;
+
+	CLocker _locker;
+    CPacketList	_packet_list;
 };

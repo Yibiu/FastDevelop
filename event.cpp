@@ -1,7 +1,80 @@
 #include "event.h"
 
 #ifdef WIN32
+CEvent::CEvent()
+{
+	_event = NULL;
+}
+
+CEvent::~CEvent()
+{
+}
+
+int CEvent::wait_for_single_object(CEvent *event_ptr, int timeout_ms)
+{
+	return WaitForSingleObject(event_ptr->get_handle(), 
+		timeout_ms == -1 ? INFINITE : timeout_ms);
+}
+
+int CEvent::wait_for_multi_objects(CEvent **events_ptr, int count, int timeout_ms)
+{
+	if (count >= MAX_EVENTS_NUM)
+		return -1;
+	
+	HANDLE events[MAX_EVENTS_NUM];
+	for (int i = 0;i < count;i++)
+		events[i] = events_ptr[i]->get_handle();
+	return WaitForMultipleObjects(events, count, FALSE, timeout_ms == -1 ? INFINITE : timeout_ms);
+}
+
+bool CEvent::create(bool init_set = false)
+{
+	_event = CreateEvent(NULL, FALSE, init_set ? TRUE : FALSE, NULL);
+	if (NULL == _event)
+		return false;
+	
+	return true;
+}
+
+void CEvent::destroy()
+{
+	if (NULL != _event) {
+		CloseHandle(_event);
+		_event = NULL;
+	}
+}
+
+bool CEvent::is_valid()
+{
+	return (NULL != _event);
+}
+
+HANDLE CEvent::get_handle()
+{
+	return _event;
+}
+
+bool CEvent::set()
+{
+	if (!is_valid())
+		return false;
+
+	SetEvent(_event);
+	return true;
+}
+
+bool CEvent::reset()
+{
+	if (!is_valid())
+		return false;
+	
+	ResetEvent(_event);
+	return true;
+}
+
+
 #else
+
 
 CEvent::CEvent()
 {

@@ -1,8 +1,8 @@
-#include "seqqueue.h"
+#include "circle_queue.h"
 
 
 template <typename T, int size>
-CSeqQueue<T, size>::CSeqQueue()
+CCircleQueue<T, size>::CCircleQueue()
 {
 	_max_size = size;
 	_front = 0;
@@ -10,66 +10,65 @@ CSeqQueue<T, size>::CSeqQueue()
 }
 
 template <typename T, int size>
-CSeqQueue<T, size>::~CSeqQueue()
+CCircleQueue<T, size>::~CCircleQueue()
 {
 }
 
 template <typename T, int size>
-int CSeqQueue<T, size>::capacity() const
+int CCircleQueue<T, size>::capacity() const
 {
 	return _max_size;
 }
 
 template <typename T, int size>
-int CSeqQueue<T, size>::length() const
+int CCircleQueue<T, size>::length() const
 {
-	return (_rear - _front);
+	return ((_rear - _front + _max_size) % _max_size);
 }
 
 template <typename T, int size>
-bool CSeqQueue<T, size>::is_empty() const
+bool CCircleQueue<T, size>::is_empty() const
 {
 	return (_rear == _front);
 }
 
 template <typename T, int size>
-bool CSeqQueue<T, size>::is_full() const
+bool CCircleQueue<T, size>::is_full() const
 {
-	return (0 == _front && _rear == _max_size);
+	return ((_rear + 1) % _max_size == _front);
 }
 
 template <typename T, int size>
-void CSeqQueue<T, size>::clear()
+void CCircleQueue<T, size>::clear()
 {
 	_front = 0;
 	_rear = 0;
 }
 
 template <typename T, int size>
-bool CSeqQueue<T, size>::queue(const T &x)
+bool CCircleQueue<T, size>::queue(const T &x)
 {
 	if (is_full())
 		return false;
 
-	if (_rear == _max_size) {
-		_move_forward();
-	}
-	_data[_rear++] = x;
+	_data[_rear] = x;
+	_rear = (_rear + 1) % _max_size;
 	return true;
 }
 
 template <typename T, int size>
-bool CSeqQueue<T, size>::dequeue(T &x)
+bool CCircleQueue<T, size>::dequeue(T &x)
 {
 	if (is_empty())
 		return false;
 
-	x = _data[_front++];
+	x = _data[_front];
+	_front = (_front + 1) % _max_size;
 	return true;
 }
 
 template <typename T, int size>
-bool CSeqQueue<T, size>::get_front(T &x) const
+bool CCircleQueue<T, size>::get_front(T &x) const
 {
 	if (is_empty())
 		return false;
@@ -79,7 +78,7 @@ bool CSeqQueue<T, size>::get_front(T &x) const
 }
 
 template <typename T, int size>
-bool CSeqQueue<T, size>::get_back(T &x) const
+bool CCircleQueue<T, size>::get_back(T &x) const
 {
 	if (is_empty())
 		return false;
@@ -89,23 +88,11 @@ bool CSeqQueue<T, size>::get_back(T &x) const
 }
 
 template <typename T, int size>
-void CSeqQueue<T, size>::show() const
+void CCircleQueue<T, size>::show() const
 {
 	cout << "{ ";
 	for (int i = _front; i < _rear; i++) {
 		cout << _data[i] << " ";
 	}
 	cout << "}" << endl;
-}
-
-
-template <typename T, int size>
-void CSeqQueue<T, size>::_move_forward()
-{
-	int index = 0;
-	for (int i = _front; i < _rear; i++) {
-		_data[index++] = _data[i];
-	}
-	_front = 0;
-	_rear = index;
 }

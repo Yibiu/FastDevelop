@@ -146,10 +146,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="circle_queue.h" />
     <ClInclude Include="queue.h" />
     <ClInclude Include="seqqueue.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="circle_queue.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="seqqueue.cpp" />
   </ItemGroup>

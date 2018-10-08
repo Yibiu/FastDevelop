@@ -3,11 +3,11 @@
 
 
 template <typename T, int size>
-class CSeqQueue : public CQueue<T>
+class CCircleQueue : public CQueue<T>
 {
 public:
-	CSeqQueue();
-	virtual ~CSeqQueue();
+	CCircleQueue();
+	virtual ~CCircleQueue();
 
 	// CQueue
 	virtual int capacity() const;
@@ -20,9 +20,6 @@ public:
 	virtual bool get_front(T &x) const;
 	virtual bool get_back(T &x) const;
 	virtual void show() const;
-
-protected:
-	void _move_forward();
 
 protected:
 	T _data[size];

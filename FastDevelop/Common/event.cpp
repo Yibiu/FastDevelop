@@ -1,5 +1,6 @@
 #include "event.h"
 
+
 #ifdef WIN32
 CEvent::CEvent()
 {
@@ -10,26 +11,24 @@ CEvent::~CEvent()
 {
 }
 
-int CEvent::wait_for_single_object(CEvent *event_ptr, int timeout_ms)
+int CEvent::wait_for_single_object(CEvent *evt_ptr, int timeout_ms)
 {
-	return WaitForSingleObject(event_ptr->get_handle(), 
+	return WaitForSingleObject(evt_ptr->get_handle(),
 		timeout_ms == -1 ? INFINITE : timeout_ms);
 }
 
-int CEvent::wait_for_multi_objects(CEvent **events_ptr, int count, int timeout_ms)
+int CEvent::wait_for_multi_objects(CEvent **evts_ptr, int count, int timeout_ms)
 {
-	if (count >= MAX_EVENTS_NUM)
-		return -1;
-	
-	HANDLE events[MAX_EVENTS_NUM];
-	for (int i = 0;i < count;i++)
-		events[i] = events_ptr[i]->get_handle();
-	return WaitForMultipleObjects(events, count, FALSE, timeout_ms == -1 ? INFINITE : timeout_ms);
+	std::vector<HANDLE> events;
+	for (int i = 0; i < count; i++) {
+		events.push_back(evts_ptr[i]->get_handle());
+	}
+	return WaitForMultipleObjects(count, &events[0], FALSE, timeout_ms == -1 ? INFINITE : timeout_ms);
 }
 
-bool CEvent::create(bool init_set = false)
+bool CEvent::create(const char *name_ptr, bool manual_reset, bool init_set)
 {
-	_event = CreateEvent(NULL, FALSE, init_set ? TRUE : FALSE, NULL);
+	_event = CreateEventA(NULL, manual_reset ? TRUE : FALSE, init_set ? TRUE : FALSE, name_ptr);
 	if (NULL == _event)
 		return false;
 	
@@ -74,8 +73,6 @@ bool CEvent::reset()
 
 
 #else
-
-
 CEvent::CEvent()
 {
 	_fd = -1;
@@ -85,16 +82,15 @@ CEvent::~CEvent()
 {
 }
 
-// error: -1, timeout: 0, value: others
-int CEvent::wait_for_single_object(CEvent *event_ptr, int timeout_ms = -1)
+int CEvent::wait_for_single_object(CEvent *evt_ptr, int timeout_ms = -1)
 {
 	int fd = event_ptr->get_fd();
 	fd_set rfds;
 	FD_ZERO(&rfds);
 	FD_SET(fd, &rfds);
 	
-	struct timeval tv;
-	struct timeval *ptv = NULL;
+	timeval tv;
+	timeval *ptv = NULL;
 	if (timeout_ms < 0) {
 		ptv = NULL;
 	} 
@@ -103,11 +99,10 @@ int CEvent::wait_for_single_object(CEvent *event_ptr, int timeout_ms = -1)
 		tv.tv_usec = (timeout_ms % 1000) * 1000;
 		ptv = &tv;
 	}
-	int ret = select(fd + 1, &rfds, NULL, NULL, ptv);
-	return ret;
+	return select(fd + 1, &rfds, NULL, NULL, ptv);
 }
 
-int CEvent::wait_for_multi_objects(CEvent **events_ptr, int count, int timeout_ms = -1)
+int CEvent::wait_for_multi_objects(CEvent **evts_ptr, int count, int timeout_ms = -1)
 {
 	fd_set rfds;
 	FD_ZERO(&rfds);
@@ -119,8 +114,8 @@ int CEvent::wait_for_multi_objects(CEvent **events_ptr, int count, int timeout_m
 			maxfd = fd;
 	}
 	
-	struct timeval tv;
-	struct timeval *ptv = NULL;
+	timeval tv;
+	timeval *ptv = NULL;
 	if (timeout_ms < 0) {
 		ptv = NULL;
 	} 
@@ -129,17 +124,12 @@ int CEvent::wait_for_multi_objects(CEvent **events_ptr, int count, int timeout_m
 		tv.tv_usec = (timeout_ms % 1000) * 1000;
 		ptv = &tv;
 	}
-	int ret = select(maxfd + 1, &rfds, NULL, NULL, ptv);
-	return ret;
+	return select(maxfd + 1, &rfds, NULL, NULL, ptv);
 }
 
-bool CEvent::create(bool init_signal)
+bool CEvent::create(const char *name_ptr, bool manual_reset, bool init_set)
 {
-	if (-1 != _fd) {
-		destroy();
-	}
-		
-	_fd = eventfd(init_signal ? 1 : 0, EFD_NONBLOCK);
+	_fd = eventfd(init_set ? 1 : 0, EFD_NONBLOCK);
 	if (-1 == _fd) {
 		return false;
 	}
@@ -167,9 +157,9 @@ int CEvent::get_fd()
 
 bool CEvent::set()
 {
-	if (-1 == _fd) {
+	if (!is_valid())
 		return false;
-	}
+
 	uint64_t u = 1;
 	int ret = write(_fd, &u, sizeof(uint64_t));
 	return (ret == sizeof(uint64_t));
@@ -180,7 +170,7 @@ bool CEvent::reset()
 	uint64_t u = 0;
 	bool success = false;
 	do {
-		if (-1 == _fd)
+		if (!is_valid())
 			break;
 
 		int ret = write(_fd, &u, sizeof(uint64_t));
@@ -202,7 +192,7 @@ bool CEvent::is_signaled()
 	FD_ZERO(&rfds);
 	FD_SET(_fd, &rfds);
 	
-	struct timeval tv;
+	timeval tv;
 	tv.tv_sec = 0;
 	tv.tv_usec = 0;
 	int ret = select(_fd + 1, &rfds, NULL, NULL, &tv);
@@ -213,3 +203,4 @@ bool CEvent::is_signaled()
 }
 
 #endif
+

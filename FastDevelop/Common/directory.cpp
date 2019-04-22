@@ -218,6 +218,7 @@ bool CDirHelpFunctions::walk_through_folder(const std::string &folder_path, std:
 		}
 		closedir(dir_ptr);
 #endif
+	} while (false);
 
 	return (!error);
 }
@@ -303,3 +304,4 @@ bool CDirHelpFunctions::remove_file(const std::string &file_path)
 {
 	return (0 == remove(file_path.c_str()));
 }
+

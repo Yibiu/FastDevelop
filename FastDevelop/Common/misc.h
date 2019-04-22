@@ -1,10 +1,13 @@
 #pragma once
 #include <stdlib.h>
+#include <time.h>
 #include <string>
 #ifdef WIN32
 #include <Windows.h>
+#endif
 
 
+#ifdef WIN32
 static std::wstring char_to_wchar(const char *ansy)
 {
 	std::wstring wansy_string = L"";
@@ -20,7 +23,7 @@ static std::wstring char_to_wchar(const char *ansy)
 
 		delete[] wansy;
 	}
-	
+
 	return wansy_string;
 }
 
@@ -43,11 +46,24 @@ static std::string wchar_to_char(const wchar_t *wansy)
 	return ansy_string;
 }
 
+
+// Get elapsed time in us from Unix Epoch
+inline uint64_t get_timestamp_us() {
+	FILETIME ft;
+	GetSystemTimeAsFileTime(&ft);
+
+	// Convert to Unix Epoch
+	uint64_t current = (((uint64_t)ft.dwHighDateTime) << 32) | ft.dwLowDateTime;
+	current -= 116444736000000000LL;
+	current /= 10;
+	return current;
+}
+
 static uint64_t get_time_ms()
 {
 	SYSTEMTIME tm_sys;
 	GetLocalTime(&tm_sys);
-	struct tm tm_time;
+	tm tm_time;
 	tm_time.tm_year = tm_sys.wYear - 1900;
 	tm_time.tm_mon = tm_sys.wMonth - 1;
 	tm_time.tm_mday = tm_sys.wDay;
@@ -55,19 +71,18 @@ static uint64_t get_time_ms()
 	tm_time.tm_min = tm_sys.wMinute;
 	tm_time.tm_sec = tm_sys.wSecond;
 	tm_time.tm_isdst = -1;
-	time_t clock = mktime(&tm);
+	time_t clock = mktime(&tm_time);
 	return ((uint64_t)clock * 1000 + tm_sys.wMilliseconds);
 }
 
 #else
-#include<sys/time.h>
-
 
 static uint64_t get_time_ms()
 {
-	struct timeval time_tv;
+	timeval time_tv;
 	gettimeofday(&time_tv, NULL);
 	return ((uint64_t)time_tv.tv_sec * 1000 + time_tv.tv_usec / 1000);
 }
 
 #endif
+

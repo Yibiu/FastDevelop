@@ -6,9 +6,12 @@ CLogger* CLogger::_instance_ptr = NULL;
 
 CLogger::CLogger()
 {
-	_console = NULL;
 	_levels = 0;
 	_tags.clear();
+#ifdef WIN32
+	_console = NULL;
+#endif
+	_console_valid = false;
 }
 
 CLogger::~CLogger()
@@ -57,7 +60,7 @@ void CLogger::remove_tag(const char *tag)
 
 void CLogger::log(log_level_t level, const char *tag, const char *fmt, ...)
 {
-	if (NULL == _console && !_file.is_open())
+	if (!_console_valid && !_file.is_open())
 		return;
 	if (!has_level(level))
 		return;
@@ -88,27 +91,17 @@ void CLogger::log(log_level_t level, const char *tag, const char *fmt, ...)
 		break;
 	}
 	logger = "[" + logger + "|" + tag + "]: " + str;
-	if (NULL != _console) {
-		WriteConsole(_console, logger.c_str(), logger.length(), 0, 0);
-	}
 	if (_file.is_open()) {
 		_file << logger.c_str();
 		_file.flush();
 	}
-}
-
-bool CLogger::open_console()
-{
-	AllocConsole();
-	freopen("CON", "w", stdout);
-	_console = GetStdHandle(STD_OUTPUT_HANDLE);
-	return (NULL != _console);
-}
-
-void CLogger::close_console()
-{
-	FreeConsole();
-	_console = NULL;
+	if (_console_valid) {
+#ifdef WIN32
+		WriteConsole(_console, logger.c_str(), logger.length(), 0, 0);
+#else
+		printf(logger.c_str());
+#endif
+	}
 }
 
 bool CLogger::open_file(const char *path_ptr)
@@ -121,6 +114,33 @@ void CLogger::close_file()
 {
 	_file.flush();
 	_file.close();
+}
+
+bool CLogger::open_console()
+{
+#ifdef WIN32
+	AllocConsole();
+	freopen("CON", "w", stdout);
+	_console = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (NULL != _console) {
+		_console_valid = true;
+	}
+#else
+	_console_valid = true;
+#endif
+
+	return _console_valid;
+}
+
+void CLogger::close_console()
+{
+	_console_valid = false;
+#ifdef WIN32
+	if (NULL != _console) {
+		FreeConsole();
+	}
+	_console = NULL;
+#endif
 }
 
 

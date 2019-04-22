@@ -5,6 +5,7 @@
 #define _FILE_OFFSET_BITS	64
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <memory.h>
 #include <limits.h>
 #ifdef WIN32
@@ -21,6 +22,10 @@
 #define IO_IS_ALIGNED(value, align)     ((value & (align - 1)) == 0)
 
 
+/**
+* @brief:
+* Basic IO for opt and bytes io
+*/
 class ICBaseIO
 {
 public:
@@ -47,6 +52,10 @@ public:
 };
 
 
+/**
+* @breif:
+* Buffer for io
+*/
 class CBufferIO : public ICBaseIO
 {
 public:
@@ -79,6 +88,10 @@ protected:
 };
 
 
+/**
+* @brief:
+* File read/write with system cache
+*/
 class CCacheFileIO : public ICBaseIO
 {
 public:
@@ -108,9 +121,14 @@ protected:
 
 #ifdef WIN32
 #else
+// Only for Linux
 #define _GNU_SOURCE
 
 
+/**
+* @brief:
+* File read/write on Linux
+*/
 class CFileIO : public ICBaseIO
 {
 public:
@@ -133,6 +151,10 @@ protected:
 };
 
 
+/**
+* @breif:
+* Direct mode for file read/write
+*/
 class CDirectFileIO : public ICBaseIO
 {
 public:
@@ -171,3 +193,4 @@ protected:
 };
 
 #endif
+

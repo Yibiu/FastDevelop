@@ -38,3 +38,4 @@ public:
 	static bool truncate_file(const std::string &file_path, uint64_t offset);
 	static bool remove_file(const std::string &file_path);
 };
+

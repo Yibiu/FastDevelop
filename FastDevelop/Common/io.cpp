@@ -385,6 +385,8 @@ bool CCacheFileIO::write(uint32_t size, const uint8_t *data_ptr)
 }
 
 
+#ifdef WIN32
+#else
 // CFileIO
 CFileIO::CFileIO()
 {
@@ -735,4 +737,6 @@ bool CDirectFileIO::_write_buffer()
 
 	return (!error);
 }
+
+#endif
 

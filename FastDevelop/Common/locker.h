@@ -3,6 +3,10 @@
 #include <Windows.h>
 
 
+/**
+* @breif:
+* Basic locker for Windows
+*/
 class CLocker
 {
 public:
@@ -32,6 +36,7 @@ protected:
 	CRITICAL_SECTION _cs;
 };
 
+
 #else
 extern "C"
 {
@@ -39,6 +44,10 @@ extern "C"
 }
 
 
+/**
+* @brief:
+* Basic locker for Linux
+*/
 class CLocker
 {
 public:
@@ -112,6 +121,10 @@ protected:
 #endif
 
 
+/**
+* @breif:
+* Auto locker
+*/
 class CAutoLocker
 {
 public:
@@ -129,7 +142,10 @@ protected:
 };
 
 
-
+/**
+* @breif:
+* Auto unlocker
+*/
 class CAutoUnlocker
 {
 public:

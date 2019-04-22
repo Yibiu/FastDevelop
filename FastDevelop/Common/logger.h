@@ -1,18 +1,14 @@
 #pragma once
 #pragma warning(disable: 4996)
 #include <stdio.h>
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
 #include <fstream>
 #include <vector>
+#ifdef WIN32
+#include <Windows.h>
+#endif
 
 
-#define TAG_CONTROL			"CONTROL"
-#define TAG_LISTENER		"LISTENER"
-#define TAG_ENCODER			"ENCODER"
-#define TAG_RTMP			"RTMP"
-
-#define LOGGER_FIEL			"./holo_driver.log"
+#define LOGGER_FIEL			"./logger.log"
 
 
 /**
@@ -44,13 +40,13 @@ public:
 
 	void log(log_level_t level, const char *tag, const char *fmt, ...);
 
-	// Console
-	bool open_console();
-	void close_console();
-
 	// File
 	bool open_file(const char *path_ptr);
 	void close_file();
+
+	// Console
+	bool open_console();
+	void close_console();
 
 protected:
 	bool _found_tag(const char *tag, bool remove = false);
@@ -58,10 +54,13 @@ protected:
 protected:
 	static CLogger *_instance_ptr;
 
-	HANDLE _console;
-	std::ofstream _file;
 	uint32_t _levels;
 	std::vector<std::string> _tags;
+	std::ofstream _file;
+#ifdef WIN32
+	HANDLE _console;
+#endif
+	bool _console_valid;
 };
 
 
@@ -69,4 +68,6 @@ protected:
 #define LogW(tag, fmt, ...)		CLogger::get_instance()->log(CLogger::LOG_LEVEL_WARNING, tag, fmt, ##__VA_ARGS__)
 #define LogE(tag, fmt, ...)		CLogger::get_instance()->log(CLogger::LOG_LEVEL_ERROR, tag, fmt, ##__VA_ARGS__)
 
+
+#define LOG(level, fmt, ...)	printf("["#level"]: "#fmt"\n", ##__VA_ARGS__)
 

@@ -152,6 +152,7 @@
     <ClInclude Include="io.h" />
     <ClInclude Include="locker.h" />
     <ClInclude Include="logger.h" />
+    <ClInclude Include="media_defs.h" />
     <ClInclude Include="misc.h" />
     <ClInclude Include="packet.h" />
     <ClInclude Include="rt_status.h" />

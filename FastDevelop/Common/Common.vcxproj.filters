@@ -48,6 +48,9 @@
     <ClInclude Include="misc.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="media_defs.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="event.cpp">

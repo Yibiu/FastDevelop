@@ -169,7 +169,7 @@ void CSingleList<T>::show() const
 }
 
 template <typename T>
-link_node_t<T>* CSingleList<T>::get_head()
+const link_node_t<T>* CSingleList<T>::get_head()
 {
 	return _head;
 }

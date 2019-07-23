@@ -1,4 +1,5 @@
 #pragma once
+#include "../defines.h"
 #include "linear.h"
 
 
@@ -23,7 +24,7 @@ public:
 	virtual bool set(int index, const T &x);
 	virtual void show() const;
 
-	link_node_t<T>* get_head();
+	const link_node_t<T>* get_head();
 
 protected:
 	link_node_t<T> *_head;

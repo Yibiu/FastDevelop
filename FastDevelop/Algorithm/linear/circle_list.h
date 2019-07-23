@@ -1,4 +1,5 @@
 #pragma once
+#include "../defines.h"
 #include "linear.h"
 
 
@@ -28,3 +29,4 @@ public:
 protected:
 	link_node_t<T> *_head;
 };
+

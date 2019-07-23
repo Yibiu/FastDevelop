@@ -34,7 +34,7 @@ bool CSeqLinear<T, size>::is_empty() const
 template <typename T, int size>
 bool CSeqLinear<T, size>::is_full() const
 {
-	return (_last == (_max_size - 1));
+	return ((_last + 1) == _max_size);
 }
 
 template <typename T, int size>

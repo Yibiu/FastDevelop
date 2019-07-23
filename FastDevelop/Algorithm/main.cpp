@@ -26,8 +26,8 @@ void test_linear()
 {
 	//CSeqLinear<int, 100> linear;
 	//CSingleList<int> linear;
-	//CCircleList<int> linear;
-	CDoubleList<int> linear;
+	CCircleList<int> linear;
+	//CDoubleList<int> linear;
 
 	linear.clear();
 	for (int i = 0; i < 10; i++) {
@@ -85,13 +85,52 @@ void test_stack()
 	stack.show();
 }
 
+void josephus()
+{
+	int n, m;
+	cout << "People Count:" << endl;
+	cin >> n;
+	cout << "Number Count:" << endl;
+	cin >> m;
+
+	CCircleList<int> linear;
+	for (int i = 1; i <= n; i++) {
+		linear.insert(i - 1, i);
+	}
+	cout << "Before calculating..." << endl;
+	linear.show();
+
+	cout << "Calculating..." << endl;
+	link_node_t<int> *cur = linear.get_head();
+	link_node_t<int> *pre = NULL;
+	while (linear.length() > 1)
+	{
+		for (int i = 0; i < m; i++) {
+			pre = cur;
+			cur = cur->next;
+		}
+
+		cout << "Queue Out is: " << cur->data << endl;
+		pre->next = cur->next;
+		delete cur;
+		cur = pre->next;
+	}
+
+	cout << "After calculating..." << endl;
+	linear.show();
+
+	int last = 0;
+	linear.get(0, last);
+	cout << " The last on is " << last << "!" << endl;
+}
 
 int main()
 {
-	test_linear();
-	test_queue();
-	test_sort();
-	test_stack();
+	//test_linear();
+	//test_queue();
+	//test_sort();
+	//test_stack();
+	josephus();
 
 	return 0;
 }

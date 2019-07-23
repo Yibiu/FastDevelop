@@ -6,15 +6,16 @@
 using namespace std;
 
 
-template <typename T>
-struct link_node_t
-{
-	T data;
-	link_node_t<T> *next;
-	link_node_t<T> *pre; // Used for double list
-};
-
-
+/**
+* @brief:
+* Basic class for linear list
+*
+* 线性表(Linear List) = 顺序表(Sequential List) + 链表(Linked List)
+* 顺序表：基于数组，内存连续
+*	1. 静态方式：事先分配，固定内存大小
+*	2. 动态方式：使用时分配，动态扩展内存大小
+* 链表：基于指针和动态分配，内存不连续
+*/
 template <typename T>
 class CLinear
 {
